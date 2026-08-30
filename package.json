@@ -1,0 +1,35 @@
+{
+  "name": "mdserve",
+  "version": "1.0.0",
+  "description": "ディレクトリ内のMarkdownファイルをHTMLとしてレンダリングし、Webサーバーとして公開するCLIツール",
+  "type": "module",
+  "bin": {
+    "mdserve": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsc && node dist/cli.js",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "keywords": [
+    "markdown",
+    "cli",
+    "server",
+    "html"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "marked": "^14.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  }
+}
