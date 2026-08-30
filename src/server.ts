@@ -109,8 +109,9 @@ async function handleRequest(
 /**
  * ルートディレクトリ配下に収まる安全な絶対パスを返す。
  * 範囲外へ抜け出そうとした場合は null を返す。
+ * （テストから参照するためエクスポートする）
  */
-function resolveSafePath(root: string, pathname: string): string | null {
+export function resolveSafePath(root: string, pathname: string): string | null {
   // 先頭スラッシュを除去して相対パス化してから解決
   const relative = pathname.replace(/^\/+/, "");
   const resolved = path.resolve(root, relative);

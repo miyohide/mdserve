@@ -121,8 +121,32 @@ mdserve/
 npm run build   # TypeScriptをビルド
 npm run start   # ビルド済みのCLIを起動
 npm run dev     # ビルドしてから起動
-npm run clean   # dist ディレクトリを削除
+npm test        # テストをビルドして実行
+npm run clean   # dist / dist-test ディレクトリを削除
 ```
+
+## テスト
+
+テストはNode.js標準の `node:test` を使用しています。追加のライブラリは不要です。次のコマンドで実行します。
+
+```
+npm test
+```
+
+`npm test` は内部で次の処理を行います。
+
+1. `tsconfig.test.json` を使ってテストコードを含む全ソースを `dist-test/` にコンパイル
+2. `node --test` でコンパイル済みのテスト（`dist-test/**/*.test.js`）を実行
+
+テストコードは各モジュールと同じ場所に `*.test.ts` として配置しています。
+
+| テストファイル | 対象 | 内容 |
+| --- | --- | --- |
+| `src/args.test.ts` | 引数解析 | オプションの解析、バリデーション、エラー処理 |
+| `src/render.test.ts` | HTML変換 | Markdown変換、HTMLエスケープ、テンプレート生成 |
+| `src/server.test.ts` | サーバー | パストラバーサル判定、実サーバーへのHTTPリクエスト検証 |
+
+本番ビルド（`npm run build`）の出力 `dist/` にはテストファイルは含まれません。
 
 ## ライセンス
 
