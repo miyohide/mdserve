@@ -10,6 +10,19 @@ marked.setOptions({
   breaks: false,
 });
 
+// Markdown本文中のリンクを新しいタブで開くようにカスタマイズする。
+// リンク要素（<a>）に target="_blank" と rel="noopener noreferrer" を付与する。
+// rel の指定は、新しいタブを開いた際のセキュリティ対策（tabnabbing 対策）。
+marked.use({
+  renderer: {
+    link({ href, title, tokens }) {
+      const text = this.parser.parseInline(tokens);
+      const titleAttr = title ? ` title="${title}"` : "";
+      return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    },
+  },
+});
+
 /**
  * Markdown文字列をHTML本文（body内）に変換する。
  */

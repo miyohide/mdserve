@@ -29,9 +29,11 @@ test("表（GFM）をHTMLに変換する", async () => {
   assert.match(html, /<th>列1<\/th>/);
 });
 
-test("リンクをHTMLに変換する", async () => {
+test("リンクをHTMLに変換する（新しいタブで開く）", async () => {
   const html = await markdownToHtml("[リンク](./page.md)");
-  assert.match(html, /<a href="\.\/page\.md">リンク<\/a>/);
+  assert.match(html, /<a href="\.\/page\.md"[^>]*>リンク<\/a>/);
+  assert.match(html, /target="_blank"/);
+  assert.match(html, /rel="noopener noreferrer"/);
 });
 
 test("escapeHtml は特殊文字をエスケープする", () => {
