@@ -12,6 +12,8 @@ export interface CliOptions {
   host: string;
   /** 起動時にブラウザを自動で開くか */
   open: boolean;
+  /** ファイル変更時にブラウザを自動リロードするか（ライブリロード） */
+  live: boolean;
   /** ヘルプ表示のみを行うか */
   help: boolean;
   /** バージョン表示のみを行うか */
@@ -32,6 +34,7 @@ export function parseArgs(argv: string[]): CliOptions {
     port: DEFAULT_PORT,
     host: DEFAULT_HOST,
     open: false,
+    live: true,
     help: false,
     version: false,
   };
@@ -56,6 +59,14 @@ export function parseArgs(argv: string[]): CliOptions {
       case "-o":
       case "--open":
         options.open = true;
+        break;
+
+      case "--live":
+        options.live = true;
+        break;
+
+      case "--no-live":
+        options.live = false;
         break;
 
       case "-p":
@@ -141,6 +152,7 @@ export function helpText(): string {
   -p, --port <番号>       リッスンするポート番号（既定: ${DEFAULT_PORT}）
       --host <ホスト>     バインドするホスト（既定: ${DEFAULT_HOST}）
   -o, --open              起動時にブラウザを自動で開く
+      --no-live           ライブリロードを無効にする（既定: 有効）
   -h, --help              このヘルプを表示する
   -v, --version           バージョンを表示する
 

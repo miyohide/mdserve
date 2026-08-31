@@ -7,6 +7,7 @@ import { createReadStream } from "node:fs";
 import path from "node:path";
 
 import { markdownToHtml, renderPage, escapeHtml } from "./render.js";
+import { LiveReload, liveReloadClientScript } from "./livereload.js";
 
 /** 拡張子ごとのMIMEタイプ */
 const MIME_TYPES: Record<string, string> = {
@@ -36,15 +37,22 @@ export interface ServerConfig {
   root: string;
   port: number;
   host: string;
+  /** ライブリロードを有効にするか（省略時は無効） */
+  live?: boolean;
 }
 
 /**
  * HTTPサーバーを生成して返す。呼び出し側で listen する。
+ *
+ * ライブリロードが有効な場合、返り値のサーバーには `liveReload` プロパティが
+ * 付与される。呼び出し側で `start()` して監視を開始し、終了時に `close()` する。
  */
 export function createServer(config: ServerConfig): http.Server {
-  return http.createServer((req, res) => {
+  const liveReload = config.live ? new LiveReload(config.root) : null;
+
+  const server = http.createServer((req, res) => {
     // 非同期処理をラップし、想定外エラーを500として返す
-    handleRequest(req, res, config).catch((err) => {
+    handleRequest(req, res, config, liveReload).catch((err) => {
       console.error("リクエスト処理中にエラーが発生しました:", err);
       if (!res.headersSent) {
         sendError(res, 500, "サーバー内部エラーが発生しました");
@@ -53,13 +61,23 @@ export function createServer(config: ServerConfig): http.Server {
       }
     });
   });
+
+  // 呼び出し側（cli.ts）から監視の開始・終了を制御できるように公開する
+  (server as ServerWithLiveReload).liveReload = liveReload;
+  return server;
+}
+
+/** ライブリロードのインスタンスを保持するサーバー型 */
+export interface ServerWithLiveReload extends http.Server {
+  liveReload: LiveReload | null;
 }
 
 /** リクエスト1件の処理 */
 async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  config: ServerConfig
+  config: ServerConfig,
+  liveReload: LiveReload | null
 ): Promise<void> {
   if (req.method !== "GET" && req.method !== "HEAD") {
     sendError(res, 405, "許可されていないメソッドです");
@@ -75,6 +93,20 @@ async function handleRequest(
     sendError(res, 400, "不正なURLです");
     return;
   }
+
+  // ライブリロードのSSEエンドポイントを最優先で処理する
+  if (liveReload && LiveReload.isLiveReloadRequest(pathname)) {
+    if (req.method === "HEAD") {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.end();
+      return;
+    }
+    liveReload.handleSse(req, res);
+    return;
+  }
+
+  // 生成するHTMLに埋め込むライブリロード用スクリプト（無効時は空文字）
+  const injected = liveReload ? liveReloadClientScript() : "";
 
   // ルート配下の絶対パスへ解決し、パストラバーサルを防ぐ
   const resolved = resolveSafePath(config.root, pathname);
@@ -92,13 +124,13 @@ async function handleRequest(
   }
 
   if (stat.isDirectory()) {
-    await serveDirectory(res, config.root, resolved, pathname);
+    await serveDirectory(res, config.root, resolved, pathname, injected);
     return;
   }
 
   const ext = path.extname(resolved).toLowerCase();
   if (MARKDOWN_EXTENSIONS.has(ext)) {
-    await serveMarkdown(res, config.root, resolved, pathname);
+    await serveMarkdown(res, config.root, resolved, pathname, injected);
     return;
   }
 
@@ -129,7 +161,8 @@ async function serveDirectory(
   res: http.ServerResponse,
   root: string,
   dirPath: string,
-  urlPath: string
+  urlPath: string,
+  injected: string
 ): Promise<void> {
   // index.md / README.md があればそれを表示する
   const indexCandidates = ["index.md", "README.md", "readme.md"];
@@ -139,7 +172,7 @@ async function serveDirectory(
       const s = await fs.stat(candidate);
       if (s.isFile()) {
         const joinedUrl = joinUrl(urlPath, name);
-        await serveMarkdown(res, root, candidate, joinedUrl);
+        await serveMarkdown(res, root, candidate, joinedUrl, injected);
         return;
       }
     } catch {
@@ -193,7 +226,8 @@ ${items.join("\n")}
   const html = renderPage(
     `${displayPath} - mdserve`,
     body,
-    buildBreadcrumb(urlPath)
+    buildBreadcrumb(urlPath),
+    injected
   );
   sendHtml(res, html);
 }
@@ -203,7 +237,8 @@ async function serveMarkdown(
   res: http.ServerResponse,
   root: string,
   filePath: string,
-  urlPath: string
+  urlPath: string,
+  injected: string
 ): Promise<void> {
   const markdown = await fs.readFile(filePath, "utf-8");
   const bodyHtml = await markdownToHtml(markdown);
@@ -211,7 +246,8 @@ async function serveMarkdown(
   const html = renderPage(
     `${title} - mdserve`,
     bodyHtml,
-    buildBreadcrumb(urlPath)
+    buildBreadcrumb(urlPath),
+    injected
   );
   sendHtml(res, html);
 }

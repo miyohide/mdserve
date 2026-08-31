@@ -53,6 +53,18 @@ test("--open / -o でブラウザ起動フラグが立つ", () => {
   assert.equal(parseArgs(["-o"]).open, true);
 });
 
+test("ライブリロードは既定で有効", () => {
+  assert.equal(parseArgs([]).live, true);
+});
+
+test("--no-live でライブリロードが無効になる", () => {
+  assert.equal(parseArgs(["--no-live"]).live, false);
+});
+
+test("--live で明示的に有効化できる", () => {
+  assert.equal(parseArgs(["--no-live", "--live"]).live, true);
+});
+
 test("--help / -h でヘルプフラグが立つ", () => {
   assert.equal(parseArgs(["--help"]).help, true);
   assert.equal(parseArgs(["-h"]).help, true);
@@ -102,5 +114,6 @@ test("helpText は主要オプションを含む文字列を返す", () => {
   assert.match(text, /--port/);
   assert.match(text, /--host/);
   assert.match(text, /--open/);
+  assert.match(text, /--no-live/);
   assert.match(text, /--help/);
 });

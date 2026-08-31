@@ -104,15 +104,18 @@ hr { border: none; border-top: 1px solid #d0d7de; margin: 1.5rem 0; }
  * @param title  ページタイトル（<title> と表示に使用）
  * @param bodyHtml  bodyに埋め込むHTML
  * @param breadcrumb  パンくずリスト用のHTML（省略可）
+ * @param extraBodyHtml  body末尾に追加するHTML（ライブリロード用スクリプトなど。省略可）
  */
 export function renderPage(
   title: string,
   bodyHtml: string,
-  breadcrumb?: string
+  breadcrumb?: string,
+  extraBodyHtml?: string
 ): string {
   const header = breadcrumb
     ? `<div class="mdserve-header">${breadcrumb}</div>`
     : "";
+  const footer = extraBodyHtml ? `\n${extraBodyHtml}` : "";
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -123,7 +126,7 @@ export function renderPage(
 </head>
 <body>
 ${header}
-${bodyHtml}
+${bodyHtml}${footer}
 </body>
 </html>`;
 }

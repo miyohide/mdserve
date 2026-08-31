@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 
 import { parseArgs, helpText, CliArgumentError } from "./args.js";
-import { createServer } from "./server.js";
+import { createServer, ServerWithLiveReload } from "./server.js";
 
 const require = createRequire(import.meta.url);
 
@@ -92,7 +92,8 @@ function main(): void {
     root: options.root,
     port: options.port,
     host: options.host,
-  });
+    live: options.live,
+  }) as ServerWithLiveReload;
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
@@ -119,7 +120,15 @@ function main(): void {
     console.log("mdserve を起動しました");
     console.log(`  公開ディレクトリ: ${options.root}`);
     console.log(`  URL: ${url}`);
+    console.log(
+      `  ライブリロード: ${options.live ? "有効" : "無効"}`
+    );
     console.log("  終了するには Ctrl+C を押してください");
+
+    // ライブリロードが有効ならファイル監視を開始する
+    if (server.liveReload) {
+      server.liveReload.start();
+    }
 
     if (options.open) {
       openBrowser(url);
@@ -129,6 +138,9 @@ function main(): void {
   // Ctrl+C での終了を綺麗に処理する
   const shutdown = () => {
     console.log("\nmdserve を終了します");
+    if (server.liveReload) {
+      server.liveReload.close();
+    }
     server.close(() => process.exit(0));
     // 一定時間で強制終了（接続が残っている場合の保険）
     setTimeout(() => process.exit(0), 1000).unref();
