@@ -113,6 +113,22 @@ test("index も README も無いディレクトリは一覧を表示する", asy
   assert.match(body, />\.\.</);
 });
 
+test("Markdownレスポンスにはテーブル機能スクリプトが注入される", async () => {
+  const res = await fetch(`${baseUrl}/doc.md`);
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  // テーブル機能スクリプトの目印（マーカー文字列と対象化属性）を含む
+  assert.match(body, /data-table-tools/);
+  assert.match(body, /\{\.table-tools\}/);
+});
+
+test("ディレクトリ一覧にはテーブル機能スクリプトが注入されない", async () => {
+  const res = await fetch(`${baseUrl}/empty-index/`);
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.doesNotMatch(body, /data-table-tools/);
+});
+
 test("サブディレクトリのMarkdownを表示する", async () => {
   const res = await fetch(`${baseUrl}/sub/page.md`);
   assert.equal(res.status, 200);

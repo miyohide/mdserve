@@ -8,6 +8,7 @@ import path from "node:path";
 
 import { markdownToHtml, renderPage, escapeHtml } from "./render.js";
 import { LiveReload, liveReloadClientScript } from "./livereload.js";
+import { tableToolsClientScript } from "./tabletools.js";
 
 /** 拡張子ごとのMIMEタイプ */
 const MIME_TYPES: Record<string, string> = {
@@ -243,11 +244,14 @@ async function serveMarkdown(
   const markdown = await fs.readFile(filePath, "utf-8");
   const bodyHtml = await markdownToHtml(markdown);
   const title = path.basename(filePath);
+  // Markdownページにはテーブル機能スクリプトを注入する。
+  // ライブリロードスクリプト（injected）と並べて末尾に足す。
+  const extraBody = injected + tableToolsClientScript();
   const html = renderPage(
     `${title} - mdserve`,
     bodyHtml,
     buildBreadcrumb(urlPath),
-    injected
+    extraBody
   );
   sendHtml(res, html);
 }

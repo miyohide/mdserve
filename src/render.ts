@@ -2,6 +2,8 @@
 
 import { marked } from "marked";
 
+import { tableToolsStyle } from "./tabletools.js";
+
 // marked の基本設定
 // - gfm: GitHub Flavored Markdown を有効化
 // - breaks: 改行を <br> に変換
@@ -122,7 +124,7 @@ export function renderPage(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
-<style>${PAGE_STYLE}</style>
+<style>${PAGE_STYLE}${tableToolsStyle()}</style>
 </head>
 <body>
 ${header}
