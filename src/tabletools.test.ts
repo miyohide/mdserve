@@ -80,3 +80,11 @@ test("スクリプトは集計（tfoot）実装を含む", () => {
   // tfoot の生成
   assert.match(script, /createTFoot/);
 });
+
+test("スクリプトはフィルター連動の動的集計を含む", () => {
+  const script = tableToolsClientScript();
+  // 再計算関数が定義され、フィルター入力から呼ばれる
+  assert.match(script, /recalcAggregation/);
+  // 表示中の行だけを対象にする（display が none でない行）
+  assert.match(script, /style\.display !== "none"/);
+});

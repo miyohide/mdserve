@@ -120,6 +120,10 @@ export function tableToolsClientScript(): string {
     var headerCells = thead.rows.length ? Array.prototype.slice.call(thead.rows[0].cells) : [];
     var colCount = headerCells.length;
 
+    // データ行のスナップショット。ソートで並べ替えても同じ行要素を使い回すため、
+    // この配列は集計対象の全行として有効であり続ける。
+    var allRows = Array.prototype.slice.call(tbody.rows);
+
     // ラッパーで表を包み、上部に検索ボックスを置く
     var wrapper = document.createElement("div");
     wrapper.className = "mdserve-table-tools";
@@ -140,6 +144,8 @@ export function tableToolsClientScript(): string {
         var text = (rows[i].textContent || "").toLowerCase();
         rows[i].style.display = text.indexOf(q) !== -1 ? "" : "none";
       }
+      // 絞り込み後、表示中の行だけで集計を再計算する
+      recalcAggregation();
     });
 
     // --- ソート ---
@@ -197,64 +203,76 @@ export function tableToolsClientScript(): string {
     }
 
     // --- 集計（tfoot）---
-    // 各列について tbody の全データセルが厳密に数値かを判定し、
-    // 数値列は合計・平均、非数値列は先頭列に件数を表示する。
-    buildAggregation(table, tbody, colCount);
-  }
-
-  function buildAggregation(table, tbody, colCount) {
-    var dataRows = Array.prototype.slice.call(tbody.rows);
-    if (dataRows.length === 0 || colCount === 0) return;
-
-    // 列ごとの数値判定と合計
+    // 列種別（数値列か否か）は全データ行を基準に一度だけ確定する。
+    // フィルターやソートで表示行が変わっても列種別は変えず、集計値のみ再計算する。
     var isNumericCol = [];
-    var sums = [];
     for (var c = 0; c < colCount; c++) {
-      var numeric = true;
-      var sum = 0;
-      for (var r = 0; r < dataRows.length; r++) {
-        var cell = dataRows[r].cells[c];
-        var text = cell ? cellText(cell) : "";
-        if (!isNumeric(text)) { numeric = false; break; }
-        sum += parseStrictNumber(text);
+      var numeric = allRows.length > 0;
+      for (var r = 0; r < allRows.length; r++) {
+        var cell0 = allRows[r].cells[c];
+        var text0 = cell0 ? cellText(cell0) : "";
+        if (!isNumeric(text0)) { numeric = false; break; }
       }
       isNumericCol[c] = numeric;
-      sums[c] = numeric ? sum : null;
     }
-
-    var count = dataRows.length;
-    var tfoot = table.createTFoot();
-
-    // 合計行
-    var totalRow = tfoot.insertRow();
-    for (var c1 = 0; c1 < colCount; c1++) {
-      var td = document.createElement("td");
-      if (isNumericCol[c1]) {
-        td.textContent = "合計: " + formatNumber(sums[c1]);
-      } else if (c1 === 0) {
-        td.textContent = "件数: " + count;
-      } else {
-        td.innerHTML = '<span class="mdserve-agg-empty">—</span>';
-      }
-      totalRow.appendChild(td);
-    }
-
-    // 平均行（数値列が1つ以上ある場合のみ）
     var hasNumericCol = isNumericCol.some(function (v) { return v; });
-    if (hasNumericCol) {
-      var avgRow = tfoot.insertRow();
-      for (var c2 = 0; c2 < colCount; c2++) {
-        var td2 = document.createElement("td");
-        if (isNumericCol[c2]) {
-          td2.textContent = "平均: " + formatNumber(sums[c2] / count);
-        } else if (c2 === 0) {
-          td2.innerHTML = '<span class="mdserve-agg-empty">平均</span>';
+
+    // tfoot の骨組みを作る。件数行は常に、合計・平均行は数値列がある場合に用意する。
+    var tfoot = table.createTFoot();
+    var countRow = tfoot.insertRow();
+    var totalRow = hasNumericCol ? tfoot.insertRow() : null;
+    var avgRow = hasNumericCol ? tfoot.insertRow() : null;
+
+    for (var c1 = 0; c1 < colCount; c1++) {
+      countRow.appendChild(document.createElement("td"));
+      if (totalRow) totalRow.appendChild(document.createElement("td"));
+      if (avgRow) avgRow.appendChild(document.createElement("td"));
+    }
+
+    // 表示中の行だけで合計・平均・件数を計算し、tfoot を更新する。
+    function recalcAggregation() {
+      // display が none でない（＝表示中の）行だけを対象にする
+      var visibleRows = allRows.filter(function (row) {
+        return row.style.display !== "none";
+      });
+      var count = visibleRows.length;
+
+      // 件数行: 先頭セルに件数を表示、他はダッシュ
+      for (var cc = 0; cc < colCount; cc++) {
+        var td = countRow.cells[cc];
+        if (cc === 0) {
+          td.textContent = "件数: " + count;
         } else {
-          td2.innerHTML = '<span class="mdserve-agg-empty">—</span>';
+          td.innerHTML = '<span class="mdserve-agg-empty">—</span>';
         }
-        avgRow.appendChild(td2);
+      }
+
+      if (!hasNumericCol) return;
+
+      // 数値列ごとに表示中の行で合計・平均を出す
+      for (var col = 0; col < colCount; col++) {
+        var tdTotal = totalRow.cells[col];
+        var tdAvg = avgRow.cells[col];
+        if (isNumericCol[col]) {
+          var sum = 0;
+          for (var i = 0; i < visibleRows.length; i++) {
+            var cell = visibleRows[i].cells[col];
+            sum += parseStrictNumber(cell ? cellText(cell) : "");
+          }
+          tdTotal.textContent = "合計: " + formatNumber(sum);
+          tdAvg.textContent = count > 0 ? "平均: " + formatNumber(sum / count) : "平均: —";
+        } else if (col === 0) {
+          tdTotal.innerHTML = '<span class="mdserve-agg-empty">合計</span>';
+          tdAvg.innerHTML = '<span class="mdserve-agg-empty">平均</span>';
+        } else {
+          tdTotal.innerHTML = '<span class="mdserve-agg-empty">—</span>';
+          tdAvg.innerHTML = '<span class="mdserve-agg-empty">—</span>';
+        }
       }
     }
+
+    // 初期表示（全行）で一度集計する
+    recalcAggregation();
   }
 
   // 数値を見やすく整形する（整数はそのまま、小数は最大2桁まで）
